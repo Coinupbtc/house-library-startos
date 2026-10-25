@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>House Library</title>
+<link rel="icon" type="image/png" href="/skin/favicon/favicon-32x32.png">
+<link rel="apple-touch-icon" href="/skin/favicon/apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #f6f2ea;
+    --card: #fffdf8;
+    --ink: #2b2620;
+    --soft: #6f665a;
+    --line: #e2d9c9;
+    --accent: #8a4b2a;
+    --accent-ink: #fff;
+    --chip: #efe7d9;
+    --wait: #a39a8c;
+    --focus: #c47a3d;
+    --shadow: 0 1px 2px rgba(60, 40, 20, .06), 0 4px 14px rgba(60, 40, 20, .06);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1916;
+      --card: #24211d;
+      --ink: #eee6da;
+      --soft: #a99f91;
+      --line: #3a352e;
+      --accent: #e0a46d;
+      --accent-ink: #1b1916;
+      --chip: #312c26;
+      --wait: #776e62;
+      --focus: #e0a46d;
+      --shadow: none;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 28px max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left));
+  }
+  h1 {
+    font: 600 2.1rem/1.1 "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    margin: 0;
+    letter-spacing: .01em;
+  }
+  #summary { color: var(--soft); margin: 6px 0 18px; }
+  form { position: relative; display: flex; gap: 8px; }
+  #q {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 1.1rem;
+    padding: 13px 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  #q:focus, button:focus-visible, a:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+  button { font: inherit; cursor: pointer; }
+  .go {
+    padding: 0 20px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+  #suggest {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 5;
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .18);
+  }
+  #suggest[hidden] { display: none; }
+  #suggest li { padding: 9px 12px; border-radius: 8px; cursor: pointer; }
+  #suggest li[aria-selected="true"], #suggest li:hover { background: var(--chip); }
+  #suggest small { display: block; color: var(--soft); }
+  .scopes { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; }
+  .scopes button {
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: .9rem;
+  }
+  .scopes button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  #note { color: var(--soft); margin: 8px 2px 0; font-size: .92rem; }
+  #note:empty { display: none; }
+  #arriving {
+    margin: 22px 0 0;
+    padding: 12px 16px;
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    color: var(--soft);
+  }
+  #arriving[hidden] { display: none; }
+  section.shelf { margin-top: 30px; }
+  section.shelf h2 {
+    font: 600 1.35rem/1.2 "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    margin: 0 0 4px;
+  }
+  section.shelf p.sub { margin: 0 0 14px; color: var(--soft); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .book {
+    position: relative;
+    display: flex;
+    gap: 12px;
+    padding: 14px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    min-height: 104px;
+  }
+  .book:hover:not(.waiting) { border-color: var(--accent); }
+  .book a.open { color: inherit; text-decoration: none; outline: none; }
+  .book a.open::after { content: ""; position: absolute; inset: 0; border-radius: 14px; }
+  .book a.open:focus-visible::after { outline: 3px solid var(--focus); outline-offset: 1px; }
+  .cover {
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: var(--chip);
+    display: grid;
+    place-items: center;
+    font: 600 1.3rem Georgia, serif;
+    color: var(--soft);
+    overflow: hidden;
+  }
+  .cover img { width: 48px; height: 48px; object-fit: contain; }
+  .book h3 { font-size: 1rem; margin: 0 0 2px; }
+  .book p { margin: 0; color: var(--soft); font-size: .9rem; }
+  .body { flex: 1; min-width: 0; }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 8px; }
+  .meta span { background: var(--chip); border-radius: 6px; padding: 1px 7px; font-size: .78rem; color: var(--soft); }
+  .book.waiting { opacity: .62; box-shadow: none; }
+  .book.waiting .meta span.state { background: transparent; border: 1px dashed var(--wait); }
+  .surprise {
+    position: relative;
+    z-index: 1;
+    margin-left: auto;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--soft);
+    border-radius: 8px;
+    padding: 2px 8px;
+    font-size: .78rem;
+  }
+  .surprise:hover { color: var(--ink); border-color: var(--accent); }
+  #discover[hidden] { display: none; }
+  .head { display: flex; align-items: baseline; gap: 12px; }
+  #shuffle {
+    margin-left: auto;
+    flex: none;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--soft);
+    border-radius: 8px;
+    padding: 3px 10px;
+    font-size: .85rem;
+  }
+  #shuffle:hover { color: var(--ink); border-color: var(--accent); }
+  .finds { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .find {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .find:hover { border-color: var(--accent); }
+  .find .pic { position: relative; aspect-ratio: 16 / 10; background: var(--chip); }
+  .find .pic img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .find .len {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    padding: 1px 7px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, .72);
+    color: #fff;
+    font-size: .78rem;
+  }
+  .find .cap { padding: 9px 12px 11px; }
+  .find h3 {
+    margin: 0 0 2px;
+    font-size: .95rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .find p { margin: 0; color: var(--soft); font-size: .82rem; }
+  .find a { color: inherit; text-decoration: none; outline: none; }
+  .find a::after { content: ""; position: absolute; inset: 0; border-radius: 14px; }
+  .find a:focus-visible::after { outline: 3px solid var(--focus); outline-offset: -3px; }
+  .find.loading { box-shadow: none; }
+  .empty { padding: 40px 0; color: var(--soft); }
+  footer { margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--soft); font-size: .9rem; }
+  footer a { color: var(--accent); }
+  @media (max-width: 520px) {
+    .wrap { padding-top: 18px; }
+    h1 { font-size: 1.7rem; }
+    .go { padding: 0 14px; }
+    .grid { grid-template-columns: 1fr; }
+    .finds { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .find .cap { padding: 8px 10px 10px; }
+    .find h3 { font-size: .9rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>House Library</h1>
+    <p id="summary">Loading the shelf…</p>
+    <form id="search" role="search" autocomplete="off">
+      <input id="q" type="search" name="q" placeholder="Search every book" aria-label="Search every book"
+             aria-autocomplete="list" aria-controls="suggest" enterkeyhint="search">
+      <button class="go" type="submit">Search</button>
+      <ul id="suggest" role="listbox" hidden></ul>
+    </form>
+    <div class="scopes" id="scopes" role="group" aria-label="Search in"></div>
+    <p id="note" aria-live="polite"></p>
+  </header>
+  <p id="arriving" hidden></p>
+  <section class="shelf" id="discover" hidden aria-labelledby="discover-title">
+    <div class="head">
+      <h2 id="discover-title">Discover</h2>
+      <button id="shuffle" type="button">Show others</button>
+    </div>
+    <p class="sub">Videos and pictures picked at random from the books here.</p>
+    <div class="finds" id="finds"></div>
+  </section>
+  <main id="shelves"></main>
+  <footer>
+    Everything here is stored on this server and works without the internet.
+    <a href="/nojs">Plain list of every book</a>.
+    To add or remove books, open House Library in StartOS and run <b>Choose Books</b>.
+  </footer>
+</div>
+<script id="shelf" type="application/json">
+@@SHELF@@
+</script>
+<script>
+(function () {
+  'use strict';
+  var GROUPS = [
+    ['encyclopedia', 'Wikipedia', 'The encyclopedia.'],
+    ['health', 'Health and medicine', 'Conditions, medicines and emergency care.'],
+    ['home', 'Home, repair and cooking', 'Fix it, build it, grow it, cook it.'],
+    ['prepared', 'Emergencies and self-reliance', 'Water, food, shelter and knots.'],
+    ['learning', 'Learning and video', 'Courses, lessons, films and simulations.'],
+    ['reference', 'Reference and reading', 'Travel, countries, words and books.']
+  ];
+  var SHORT = { encyclopedia: 'Wikipedia', health: 'Health', home: 'Home', prepared: 'Emergencies', learning: 'Learning', reference: 'Reference' };
+  var shelf = [];
+  try { shelf = JSON.parse(document.getElementById('shelf').textContent) || []; } catch (e) { shelf = []; }
+  var live = {};          // file stem -> { id, thumb, articles }
+  var scope = 'all';
+  try { scope = localStorage.getItem('house-scope') || 'all'; } catch (e) {}
+
+  var $ = function (id) { return document.getElementById(id); };
+  function el(tag, attrs, kids) {
+    var n = document.createElement(tag);
+    for (var k in attrs || {}) {
+      if (k === 'text') n.textContent = attrs[k];
+      else if (k === 'class') n.className = attrs[k];
+      else n.setAttribute(k, attrs[k]);
+    }
+    (kids || []).forEach(function (c) { if (c) n.appendChild(c); });
+    return n;
+  }
+  function gb(bytes) {
+    var g = bytes / 1073741824;
+    return g >= 10 ? Math.round(g) + ' GB' : g * 1024 >= 1000 ? g.toFixed(1) + ' GB' : Math.max(1, Math.round(g * 1024)) + ' MB';
+  }
+  function ready(b) { return Object.prototype.hasOwnProperty.call(live, b.stem); }
+  function viewer(path) { return '/viewer#' + path; }
+  function encodePath(p) { return p.split('/').map(encodeURIComponent).join('/'); }
+
+  // ---- the catalog: which books the reader is serving right now ----
+  function refresh() {
+    fetch('/catalog/v2/entries?count=-1', { cache: 'no-store' })
+      .then(function (r) { return r.text(); })
+      .then(function (txt) {
+        var doc = new DOMParser().parseFromString(txt, 'application/xml');
+        var next = {};
+        Array.prototype.forEach.call(doc.getElementsByTagName('entry'), function (e) {
+          var html = null, thumb = null;
+          Array.prototype.forEach.call(e.getElementsByTagName('link'), function (l) {
+            if (l.getAttribute('type') === 'text/html') html = l.getAttribute('href');
+            if (l.getAttribute('rel') === 'http://opds-spec.org/image/thumbnail') thumb = l.getAttribute('href');
+          });
+          if (!html || html.indexOf('/content/') < 0) return;
+          var id = e.getElementsByTagName('id')[0];
+          var ac = e.getElementsByTagName('articleCount')[0];
+          next[html.split('/content/')[1]] = {
+            id: id ? id.textContent.replace('urn:uuid:', '') : '',
+            thumb: thumb,
+            articles: ac ? Number(ac.textContent) : 0
+          };
+        });
+        live = next;
+      })
+      .catch(function () {})
+      .then(function () {
+        render();
+        if (!started && finders(true).length + finders(false).length) { started = true; discover(); }
+        if (shelf.some(function (b) { return !ready(b); })) setTimeout(refresh, 20000);
+      });
+  }
+
+  // ---- shelves ----
+  function tile(b) {
+    var isReady = ready(b), info = live[b.stem] || {};
+    var cover = el('div', { class: 'cover', 'aria-hidden': 'true' });
+    if (isReady && info.thumb) cover.appendChild(el('img', { src: info.thumb, alt: '', loading: 'lazy' }));
+    else cover.textContent = b.title.charAt(0);
+    var meta = el('div', { class: 'meta' }, [el('span', { text: gb(b.bytes) })]);
+    if (b.pictures) meta.appendChild(el('span', { text: 'pictures' }));
+    if (b.videos) meta.appendChild(el('span', { text: 'video' }));
+    if (!isReady) meta.appendChild(el('span', { class: 'state', text: 'downloading' }));
+    if (isReady && info.articles > 20) {
+      var btn = el('button', { class: 'surprise', type: 'button', text: 'Surprise me', 'aria-label': 'Random page from ' + b.title });
+      btn.addEventListener('click', function () { surprise(b); });
+      meta.appendChild(btn);
+    }
+    var heading = el('h3', {}, [isReady
+      ? el('a', { class: 'open', href: viewer(b.stem + '/'), text: b.title })
+      : document.createTextNode(b.title)]);
+    var body = el('div', { class: 'body' }, [heading, el('p', { text: b.note }), meta]);
+    return isReady
+      ? el('div', { class: 'book' }, [cover, body])
+      : el('div', { class: 'book waiting', title: 'Still downloading onto this server' }, [cover, body]);
+  }
+
+  function render() {
+    var main = $('shelves');
+    main.textContent = '';
+    if (!shelf.length) {
+      main.appendChild(el('p', { class: 'empty', text: 'No books are chosen. Open House Library in StartOS and run Choose Books.' }));
+    }
+    GROUPS.forEach(function (g) {
+      var books = shelf.filter(function (b) { return b.group === g[0]; });
+      if (!books.length) return;
+      main.appendChild(el('section', { class: 'shelf', id: g[0] }, [
+        el('h2', { text: g[1] }),
+        el('p', { class: 'sub', text: g[2] }),
+        el('div', { class: 'grid' }, books.map(tile))
+      ]));
+    });
+    var n = shelf.filter(ready).length;
+    var total = shelf.reduce(function (s, b) { return s + b.bytes; }, 0);
+    $('summary').textContent = !shelf.length ? 'No books yet'
+      : n === shelf.length ? shelf.length + ' books · ' + gb(total) + ' on this server'
+      : n + ' of ' + shelf.length + ' books ready · ' + gb(total) + ' when all are here';
+    var waiting = shelf.filter(function (b) { return !ready(b); });
+    var arr = $('arriving');
+    arr.hidden = !waiting.length;
+    if (waiting.length) {
+      arr.textContent = (waiting.length === 1 ? '1 book is' : waiting.length + ' books are') +
+        ' still downloading: ' + waiting.map(function (b) { return b.title; }).join(', ') +
+        '. Each one appears here when it finishes. The Books status on the House Library service page shows the progress.';
+    }
+    renderScopes();
+  }
+
+  // ---- search ----
+  function inScope(b) { return b.search && ready(b) && (scope === 'all' || b.group === scope); }
+
+  function renderScopes() {
+    var box = $('scopes');
+    box.textContent = '';
+    var opts = [['all', 'Everything']];
+    GROUPS.forEach(function (g) {
+      if (shelf.some(function (b) { return b.group === g[0] && b.search; })) opts.push([g[0], SHORT[g[0]]]);
+    });
+    if (!opts.some(function (o) { return o[0] === scope; })) scope = 'all';
+    opts.forEach(function (o) {
+      var b = el('button', { type: 'button', 'aria-pressed': String(o[0] === scope), text: o[1] });
+      b.addEventListener('click', function () {
+        scope = o[0];
+        try { localStorage.setItem('house-scope', scope); } catch (e) {}
+        renderScopes();
+        $('q').focus();
+        suggestSoon();
+      });
+      box.appendChild(b);
+    });
+  }
+
+  $('search').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var pick = $('suggest').querySelector('[aria-selected="true"]');
+    if (pick && !$('suggest').hidden) { location.href = pick.dataset.href; return; }
+    var q = $('q').value.trim();
+    if (!q) return;
+    var books = shelf.filter(inScope);
+    if (!books.length) {
+      $('note').textContent = 'None of the books in this group can be searched yet.';
+      return;
+    }
+    var p = new URLSearchParams();
+    books.forEach(function (b) { p.append('books.id', live[b.stem].id); });
+    p.set('pattern', q);
+    location.href = viewer('search?' + p.toString());
+  });
+
+  // Kiwix ranks "Earth Covers Earth" above "Earth", so ask the encyclopedia for
+  // the exact title too and put it first when it exists.
+  function exactTitle(b, q) {
+    var path = encodePath((q.charAt(0).toUpperCase() + q.slice(1)).replace(/ /g, '_'));
+    return fetch('/content/' + b.stem + '/' + path, { method: 'HEAD' })
+      .then(function (r) {
+        if (!r.ok) return [];
+        var p = new URL(r.url).pathname.split('/content/')[1] || b.stem + '/' + path;
+        var title = decodeURIComponent(p.split('/').pop()).replace(/_/g, ' ');
+        return [{ title: title, book: b.title, href: viewer(p) }];
+      })
+      .catch(function () { return []; });
+  }
+
+  // Title suggestions from the first few searchable books in scope.
+  var timer = null, seq = 0;
+  function suggestSoon() { clearTimeout(timer); timer = setTimeout(suggest, 180); }
+  function suggest() {
+    var q = $('q').value.trim(), list = $('suggest'), mine = ++seq;
+    $('note').textContent = '';
+    if (q.length < 2) { list.hidden = true; return; }
+    // Shelf order puts Wikipedia first; one-page libraries have nothing to suggest.
+    var sources = shelf.filter(function (b) { return inScope(b) && live[b.stem].articles > 20; }).slice(0, 4);
+    var exact = sources.filter(function (b) { return b.group === 'encyclopedia'; }).map(function (b) { return exactTitle(b, q); });
+    Promise.all(exact.concat(sources.map(function (b) {
+      return fetch('/suggest?content=' + encodeURIComponent(b.stem) + '&term=' + encodeURIComponent(q) + '&count=4')
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (items) {
+          return items.filter(function (i) { return i.kind === 'path'; }).map(function (i) {
+            return { title: i.value, book: b.title, href: viewer(b.stem + '/' + encodePath(i.path)) };
+          });
+        })
+        .catch(function () { return []; });
+    }))).then(function (lists) {
+      if (mine !== seq) return;
+      var seen = {};
+      var items = [].concat.apply([], lists).filter(function (it) {
+        var k = it.book + '|' + it.title.toLowerCase();
+        return seen[k] ? false : (seen[k] = true);
+      }).slice(0, 8);
+      list.textContent = '';
+      items.forEach(function (it, i) {
+        var li = el('li', { role: 'option', 'aria-selected': 'false', id: 'sg' + i }, [
+          document.createTextNode(it.title), el('small', { text: it.book })
+        ]);
+        li.dataset.href = it.href;
+        li.addEventListener('mousedown', function (ev) { ev.preventDefault(); location.href = it.href; });
+        list.appendChild(li);
+      });
+      list.hidden = !items.length;
+    });
+  }
+  $('q').addEventListener('input', suggestSoon);
+  $('q').addEventListener('keydown', function (ev) {
+    var list = $('suggest'), items = list.querySelectorAll('li');
+    if (ev.key === 'Escape') { list.hidden = true; return; }
+    if (list.hidden || !items.length || (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp')) return;
+    ev.preventDefault();
+    var cur = -1;
+    items.forEach(function (li, i) { if (li.getAttribute('aria-selected') === 'true') cur = i; });
+    var next = ev.key === 'ArrowDown' ? Math.min(items.length - 1, cur + 1) : Math.max(-1, cur - 1);
+    items.forEach(function (li, i) { li.setAttribute('aria-selected', String(i === next)); });
+  });
+  $('q').addEventListener('blur', function () { setTimeout(function () { $('suggest').hidden = true; }, 120); });
+
+  // ---- a random page, opened inside the reader ----
+  function surprise(b) {
+    fetch('/random?content=' + encodeURIComponent(b.stem), { cache: 'no-store' })
+      .then(function (r) {
+        var path = new URL(r.url).pathname.split('/content/')[1];
+        location.href = viewer(path || b.stem + '/');
+      })
+      .catch(function () { location.href = viewer(b.stem + '/'); });
+  }
+
+  // ---- discover: a few videos and pictures, picked at random ----
+  var feeds = {}, misses = {}, round = 0, started = false;
+  function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+  function duration(iso) {
+    var m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso || '');
+    if (!m) return '';
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    var h = +m[1] || 0, min = +m[2] || 0, s = +m[3] || 0;
+    return h ? h + ':' + pad(min) + ':' + pad(s) : min + ':' + pad(s);
+  }
+
+  // Books from the YouTube scraper (Crash Course, Blender) list their videos in
+  // playlists.json, and each video has a page at index/<slug>.
+  function videoFind(b) {
+    var base = '/content/' + b.stem + '/';
+    function get(p) { return fetch(base + p).then(function (r) { if (!r.ok) throw r.status; return r.json(); }); }
+    feeds[b.stem] = feeds[b.stem] || get('playlists.json');
+    return feeds[b.stem]
+      .then(function (d) { return get('playlists/' + pick(d.playlists).slug + '.json'); })
+      .then(function (list) {
+        var v = pick(list.videos);
+        return { pic: base + v.thumbnailPath, title: v.title, book: b.title, len: duration(v.duration), href: viewer(b.stem + '/index/' + v.slug) };
+      });
+  }
+
+  // Wikipedia and Wikivoyage tag each picture with its full size, so a photo at
+  // least 500 px wide stands out from the icons, maps and drawings.
+  function pictureFind(b) {
+    return fetch('/random?content=' + encodeURIComponent(b.stem), { cache: 'no-store' })
+      .then(function (r) { return r.text().then(function (t) { return { url: r.url, doc: new DOMParser().parseFromString(t, 'text/html') }; }); })
+      .then(function (pg) {
+        var img = Array.prototype.find.call(pg.doc.querySelectorAll('img[data-file-width]'), function (i) {
+          var w = +i.getAttribute('data-file-width'), h = +i.getAttribute('data-file-height'), src = i.getAttribute('src') || '';
+          return w >= 500 && h > 0 && w / h > .6 && w / h < 2.4 &&
+            /\.jpe?g(\.webp)?$/i.test(src) && !/map|logo|icon|flag/i.test(src);
+        });
+        var path = new URL(pg.url).pathname.split('/content/')[1];
+        if (!img || !path) throw 'no picture';
+        return { pic: new URL(img.getAttribute('src'), pg.url).pathname, title: pg.doc.title.trim(), book: b.title, href: viewer(path) };
+      });
+  }
+
+  // A book whose first three tries found nothing sits out the rest of this visit.
+  function finders(video) {
+    return shelf.filter(function (b) {
+      return ready(b) && (misses[b.stem] || 0) < 3 &&
+        (video ? b.videos : b.pictures && /^(wikipedia|wikivoyage)_/.test(b.stem));
+    });
+  }
+
+  function fillSlot(card, video, used, tries, mine) {
+    var pool = finders(video);
+    if (!pool.length) pool = finders(!video);
+    if (!pool.length || tries > 5) {
+      card.remove();
+      if (!$('finds').children.length) $('discover').hidden = true;
+      return;
+    }
+    var fresh = pool.filter(function (b) { return used.indexOf(b.stem) < 0; });
+    var b = pick(fresh.length ? fresh : pool);
+    used.push(b.stem);
+    function retry() {
+      if (mine !== round) return;
+      misses[b.stem] = (misses[b.stem] || 0) + 1;
+      fillSlot(card, video, used, tries + 1, mine);
+    }
+    (b.videos ? videoFind(b) : pictureFind(b)).then(function (f) {
+      if (mine !== round) return;
+      misses[b.stem] = 0;
+      var img = el('img', { src: f.pic, alt: '' });
+      img.addEventListener('error', retry);
+      var pic = el('div', { class: 'pic' }, [img]);
+      if (f.len) pic.appendChild(el('span', { class: 'len', text: '▶︎ ' + f.len }));
+      card.className = 'find';
+      card.removeAttribute('aria-hidden');
+      card.textContent = '';
+      card.appendChild(pic);
+      card.appendChild(el('div', { class: 'cap' }, [
+        el('h3', {}, [el('a', { href: f.href, text: f.title })]),
+        el('p', { text: (f.len ? 'Video · ' : '') + f.book })
+      ]));
+    }, retry);
+  }
+
+  function discover() {
+    var mine = ++round, box = $('finds'), used = [];
+    var any = finders(true).length + finders(false).length > 0;
+    box.textContent = '';
+    $('discover').hidden = !any;
+    for (var i = 0; any && i < 4; i++) {
+      var card = el('div', { class: 'find loading', 'aria-hidden': 'true' }, [
+        el('div', { class: 'pic' }),
+        el('div', { class: 'cap' }, [el('h3', { text: ' ' }), el('p', { text: ' ' })])
+      ]);
+      box.appendChild(card);
+      fillSlot(card, i % 2 === 0, used, 0, mine);
+    }
+  }
+  $('shuffle').addEventListener('click', discover);
+
+  render();
+  refresh();
+})();
+</script>
+</body>
+</html>
